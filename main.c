@@ -7,6 +7,10 @@
 
 #define DELIM " \t\r\n\a"
 
+char *builtins[] = {"cd", "exit"};
+
+int num_builtins() { return sizeof(builtins) / sizeof(char *); }
+
 char **parse_command(char *line) {
   int buf_size = 100;
   int MAX_LEN = 100;
@@ -35,9 +39,20 @@ char **parse_command(char *line) {
   return words;
 }
 
-int main() {
-  printf("Welcome to shell\n");
+void exec_builtin(char *args[]) {
 
+  if (strcmp(args[0], "cd") == 0) {
+    if (chdir(args[1]) == -1) {
+      fprintf(stderr, "Could not change directory\n");
+      return;
+    }
+
+  } else if (strcmp(args[0], "exit") == 0) {
+    exit(0);
+  }
+}
+
+int main() {
   while (1) {
     char cwd[256];
 
@@ -45,7 +60,7 @@ int main() {
       exit(0);
     }
 
-    printf("%s >>>", cwd);
+    printf("%s>>", cwd);
     char *line = NULL;
     size_t len = 0;
     int nread = getline(&line, &len, stdin);
@@ -54,17 +69,23 @@ int main() {
         exit(0);
         break;
       }
-      if (line[nread - 1] == '\n') {
-        line[nread - 1] = '\0';
-        --nread;
+      char **args = parse_command(line);
+      int is_builtin = 0;
+      for (int i = 0; i < num_builtins(); i++) {
+        if (strcmp(args[0], builtins[i]) == 0) {
+          exec_builtin(args);
+          is_builtin = 1;
+          break;
+        }
       }
+      if (is_builtin)
+        continue;
       int rc = fork();
       if (rc < 0) {
         fprintf(stderr, "Something went wrong!\n");
         exit(1);
       }
       if (rc == 0) { // this is the child
-        char **args = parse_command(line);
         execvp(args[0], args);
       } else {
         wait(NULL);
